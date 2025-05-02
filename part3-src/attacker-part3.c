@@ -47,6 +47,8 @@ int run_attacker(int kernel_fd, char *shared_memory) {
 
         // [Part 3]- Fill this in!
         // leaked_byte = ??
+        leaked_byte = '?';
+        const uint64_t CACHE_HIT_THRESHOLD = 80;
         // Step 1: Train branch predictor
         for (int train = 0; train < 40; train++) {
             call_kernel_part3(kernel_fd, shared_memory, 0);
