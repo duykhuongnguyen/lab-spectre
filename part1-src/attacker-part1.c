@@ -55,6 +55,7 @@ int run_attacker(int kernel_fd, char *shared_memory) {
         // leaked_byte = ??
         leaked_byte = '?';
         const uint64_t CACHE_HIT_THRESHOLD = 80;
+        
         for (int attempt = 0; attempt < 1000; attempt++) {
             for (int i = 0; i < 256; i++) {
                 clflush(&shared_memory[i * 4096]);
