@@ -7,13 +7,12 @@ Without shared memory the attacker cannot flush the cache lines used by the vict
 
 Part 2: Basic Spectre
 
-Discussion Question 3: In a real-world Spectre attack, an attacker exploits speculative execution to bypass security boundaries and read arbitrary memory in the victim’s process or even in privileged address space (e.g., kernel memory). This is achieved by:
-- Triggering speculation in victim code via indirect branches or bounds-checked accesses.
-- Co-opting the victim to speculatively load data from a secret location into a shared cache-based side channel.
-- Observing side effects (typically via Flush+Reload or Prime+Probe) to infer secret values.
-The attacker must:
-- Identify a vulnerable code gadget that performs a speculative memory access based on secret data.
-- Control inputs to mistrain the branch predictor.
-- Use shared microarchitectural state (e.g., cache) to recover leaked values.
+Discussion Question 3: Real-world Spectre attacks exploit speculation to bypass software-enforced bounds checks and access out-of-bounds memory. By mistraining branch predictors and using microarchitectural side channels, attackers can leak secrets from anywhere in the victim’s address space, including kernel or process-private data.
 
-Discussion Question 4: The minimum number of branch training iterations needed can vary by CPU model, branch predictor design, and system noise. In our experiments on the lab machine, the attack can succeed with ≥20 iterations.
+Discussion Question 4: In our experiments, the attack began working with as few as 6 branch training rounds. However, because of noise we used at least 20–30 iterations to saturate the predictor’s history and overcome timing noise.
+
+Part 3: Advanced Spectre
+
+Discussion Question 5: We extend the speculation window by flushing part3_limit before executing the victim code. This increases the time the CPU takes to resolve the branch condition, allowing more speculative instructions (including the secret-dependent memory access) to be executed before the misprediction is corrected.
+
+Discussion Question 6: To port the attack, we need to understand the CPU's speculative behavior, cache hierarchy, timing thresholds, and whether the victim code permits shared memory interaction. These properties can often be deduced via timing attacks and system introspection tools like perf, dmesg, or /proc/cpuinfo.

