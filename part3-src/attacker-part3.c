@@ -36,6 +36,7 @@ static inline void call_kernel_part3(int kernel_fd, char *shared_memory, size_t 
  *  - kernel_fd: A file descriptor referring to the lab vulnerable kernel module
  *  - shared_memory: A pointer to a region of memory shared with the kernel
  */
+
 int run_attacker(int kernel_fd, char *shared_memory) {
     char leaked_str[SHD_SPECTRE_LAB_SECRET_MAX_LEN];
     size_t current_offset = 0;
