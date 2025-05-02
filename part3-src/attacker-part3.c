@@ -55,8 +55,7 @@ int run_attacker(int kernel_fd, char *shared_memory) {
         }
 
         // Step 2: Flush part3_limit to extend speculation window
-        extern char part3_limit[];
-        clflush(part3_limit);
+        clflush(&shared_memory[0]);
 
         // Step 3: Flush shared memory
         for (int i = 0; i < 256; i++) {
