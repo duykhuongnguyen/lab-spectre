@@ -62,13 +62,13 @@ def main():
     # Also, while this script will run forever, we will kill your autograder if it takes too long
     if args.part == '1' or args.part == 'all':
         print("Checking part 1...")
-        check("part1", 5, b"UNC{sp3ctr3_i5_c00l}", 0.80, 30)
+        check("part1", 1000, b"UNC{sp3ctr3_i5_c00l}", 0.95, 30)
     if args.part == '2' or args.part == 'all':
         print("Checking part 2...")
-        check("part2", 5, b"UNC{g0_h33ls}", 0.80, 30)
+        check("part2", 1000, b"UNC{g0_h33ls}", 0.8, 30)
     if args.part == '3' or args.part == 'all':
         print("Checking part 3...")
-        check("part3", 5, b"UNC{j4m35_B0nD}", 0.20, 600, pass_once=True)
+        check("part3", 1000, b"UNC{j4m35_B0nD}", 0.8, 600, pass_once=True)
 
 if __name__=="__main__":
     main()
