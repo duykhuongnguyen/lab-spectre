@@ -1,0 +1,7 @@
+Part 1: Leaking Kernel Memory via Flush+Reload
+
+Discussion Question 1: 256 cache lines need to be flushed, one for each possible byte value (0–255)
+
+Discussion Question 2: If the attacker and victim do not share memory, Flush+Reload will not work, because it relies on shared memory pages being mapped into both address spaces. 
+Without shared memory the attacker cannot flush the cache lines used by the victim and reload them to detect timing differences.
+
